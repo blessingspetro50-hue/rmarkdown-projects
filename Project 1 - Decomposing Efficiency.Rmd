@@ -1,0 +1,126 @@
+---
+title: "Decomposing Efficiency - (Data Envelopment Analaysis, VRS)"
+author: '**Blessings Petro**'
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+We will use the BCC DEA method. Assumptions are:
+
+  - Variable Returns to scale
+  - Decision-Making Units are operating at different Scales
+
+First you install the a package to use to run the analysis. We will use the `Benchmark` package which we can install using the code below.
+```{r}
+# code below commented out on purpose
+
+#install.packages("Benchmark", dependencies = TRUE)
+```
+--- 
+
+After the package is installed, we can now move on to Analysis. In the code below, we called the necessary packages for the purposes of the analysis and for loading the data
+
+```{r}
+# calling the packages we'll use in the analysis
+
+library(readxl) #for importing
+library(writexl) #for exporting
+library(lpSolveAPI) #for optimizing(Linear Programming)
+library(ucminf) #misc, necessary for Benchmarking
+library(quadprog) #misc, necessary for Benchmarking
+library(knitr) #for tables
+library(ggplot2) #for plots
+library(Benchmarking) #for DEA
+
+
+# loading the data
+
+data= read_xlsx(
+  "C:\\Users\\user\\Documents\\Data Clients\\Dyson Mponda\\Research Data-1.xlsx",
+  sheet = "Sheet1",
+  range = "A2:H82"
+)
+```
+\ 
+
+--- 
+
+The data has been loaded and kept in a variable called `"data"`. To get an overview of the data:
+```{r}
+kable(head(data, 5))
+```
+\ 
+
+\ 
+
+## Performing the **DEA**
+
+```{r fig.cap= "Boxplot Showing Distribution of Efficiency Scores", fig.height=3, fig.width=5}
+# defining Inputs(x)
+x_values= data.frame(data$`Seed (MK)`, data$`Labour (MK)`, data$`Pestcides and Herbicides (MK)`)
+
+# defining Outputs(y)
+y_values= data.frame(data$`Soya bean(quantity)`, data$Income)
+
+# Perform DEA
+dea_result <- dea(
+  X = x_values,
+  Y = y_values,
+  RTS = "vrs", 
+  ORIENTATION = "in"
+)
+
+# Extraction of the efficiency scores
+efficiency_scores <- dea_result$eff
+
+# Create a data frame for plotting
+data$Efficiency <- efficiency_scores
+
+# View results distribution
+ggplot(data= data, aes(x= Efficiency))+
+  geom_boxplot()
+```
+
+**NB:** output `Fertilizer` ommitted because of zeros, the model failed to optimize.
+
+
+## Summary Statistics of the Efficiency Scores
+```{r}
+summary(data$Efficiency)
+```
+
+
+## Exporting the Data
+```{r}
+write_xlsx(data, "C:\\Users\\user\\Documents\\Data Clients\\Dyson Mponda\\DEA Scores.xlsx")
+```
+
+
+\newpage
+---
+**Objective 2: Tobit Regression Model**
+---
+
+$$
+Y_i^* = \beta_0 + \beta_i X_i + \varepsilon_i
+$$
+$$
+\varepsilon \sim N(0, \sigma^2_{\varepsilon})
+$$
+\[
+Y_i = 
+\begin{cases}
+Y_i^* & \text{if } Y_i^* < b \\
+b & \text{if } Y_i^* \geq b
+\end{cases}
+\]
+
+where:\ 
+
+  - $Y_i^*:$ the dependent/latent variable\ 
+  - $\beta_0:$ the constant term\ 
+  - $\beta_i:$ a vector of coefficients\ 
+  - $X_i:$ a vector of independent variables(socio-economic and institutional factors)\ 
+  - $\varepsilon_i:$ the error term\ 
+  - $b:$ is the censoring threshold (=0.75)\ 
+
